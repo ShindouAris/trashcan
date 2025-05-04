@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replay Viewer</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+
+  <h1>Replay Viewer</h1>
+
+  <div id="controls">
+    <label for="replayUploadFile">Select Replay File (.zip or .scp):</label>
+    <input type="file" id="replayUploadFile" accept=".zip,.scp">
+    <button id="uploadButton">Upload & Process</button>
+    <button id="startButton" disabled>Start Simulation</button>
+  </div>
+
+  <div id="status">
+    <p>Please select a replay file (.zip or .scp) and click "Upload & Process".</p>
+  </div>
+
+  <div id="display" style="display: none;">
+    <div id="song-info">
+      <span>Title: <strong id="song-title">N/A</strong></span>
+      <span>Mod-used: <strong id="song-artist">N/A</strong></span>
+      <span>Difficulty: <strong id="song-difficulty">N/A</strong></span>
+      <span>Rating: <strong id="song-rating">N/A</strong></span>
+    </div>
+    <h2>Live Counts & Progress</h2>
+    <div id="counts">
+      <div class="count-item"><strong id="perfect-count">0</strong><span>Perfects</span></div>
+      <div class="count-item"><strong id="great-count">0</strong><span>Greats</span></div>
+      <div class="count-item"><strong id="good-count">0</strong><span>Goods</span></div>
+      <div class="count-item"><strong id="miss-count">0</strong><span>Misses</span></div>
+    </div>
+    <div id="progress-info">
+      <span>Time: <span id="current-time">0.000</span>s / <span id="total-duration">0.00</span>s</span>
+      <span>Combo: <span id="current-combo">0</span></span>
+      <span>Max Combo: <span id="max-combo">0</span></span>
+    </div>
+    <div id="visualizer-container">
+      <h2>Accuracy Visualizer</h2>
+      <canvas id="accuracy-visualizer" width="600" height="50"></canvas>
+    </div>
+  </div>
+
+  <div id="judgment-log-container" style="display: none;">
+    <h2>Judgment Log</h2>
+    <div id="judgment-log">
+    </div>
+  </div>
+
+  <script src="player-v3.js"></script>
+
+  </body>
+</html>

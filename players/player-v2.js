@@ -125,13 +125,12 @@ function resetSimulation() {
     currentComboElement.textContent = '0'; maxComboElement.textContent = '0';
     displayElement.style.display = 'none';
     visualizerWrapper.style.display = 'none';
-    if (ctx) drawVisualizerBackground(); // Clear canvas
+    if (ctx) drawVisualizerBackground();
 
     startButton.disabled = true;
     fileInput.disabled = false;
     updateStatus('Please load a replay JSON file.');
 }
-
 
 fileInput.addEventListener('change', (event) => {
     resetSimulation();
@@ -148,7 +147,7 @@ fileInput.addEventListener('change', (event) => {
                 if (rawData.length === 0) { throw new Error("JSON array is empty."); }
                 if (rawData.length > 1) { console.warn(`Multiple replay objects found. Using first.`); }
                 replayData = rawData[0];
-            } else if (typeof rawData === 'object' && rawData !== null) {
+            } else if (typeof rawData === 'object') {
                 console.warn(`JSON root is object, not list. Using object directly.`);
                 replayData = rawData;
             } else { throw new Error(`Unexpected JSON structure. Type: ${typeof rawData}`); }
@@ -189,7 +188,7 @@ fileInput.addEventListener('change', (event) => {
             resetSimulation();
         }
     };
-    reader.onerror = (e) => { updateStatus(`Error reading file: ${reader.error}`, true); resetSimulation(); };
+    reader.onerror = (_) => { updateStatus(`Error reading file: ${reader.error}`, true); resetSimulation(); };
     reader.readAsText(file);
 });
 
@@ -213,7 +212,7 @@ startButton.addEventListener('click', () => {
     animationFrameId = requestAnimationFrame(simulationStep);
 });
 
-function simulationStep(timestamp) {
+function simulationStep() {
     if (!simulationRunning) return;
 
     const now = performance.now();
@@ -239,7 +238,6 @@ function simulationStep(timestamp) {
         maxCombo = Math.max(maxCombo, combo);
         currentComboElement.textContent = combo; maxComboElement.textContent = maxCombo;
 
-        // Add entry to Judgment Log (unchanged logic)
         const logEntry = document.createElement('div');
         logEntry.classList.add('log-entry'); const judgmentText = judgmentMap[judgVal] ?? "Unknown";
         const logClass = judgmentLogClassMap[judgVal] ?? "log-unknown"; logEntry.classList.add(logClass);
@@ -264,9 +262,7 @@ function simulationStep(timestamp) {
         const age = now - line.addedTime;
 
         if (age < LINE_FADE_DURATION_MS) {
-            const opacity = Math.max(0, 1.0 - (age / LINE_FADE_DURATION_MS));
-
-            ctx.globalAlpha = opacity;
+            ctx.globalAlpha = Math.max(0, 1.0 - (age / LINE_FADE_DURATION_MS));
             ctx.strokeStyle = line.color;
             ctx.lineWidth = 2;
 

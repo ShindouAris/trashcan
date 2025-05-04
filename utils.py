@@ -2,7 +2,7 @@ import gzip
 import json
 import pathlib
 import zipfile
-from data import RawReplayData
+from data import RawReplayData, ReplayData
 
 def extract_mod(data: list) -> list:
     mod = []
@@ -68,6 +68,7 @@ def rename_ext(file: pathlib.Path):
 def extract_replay(file: pathlib.Path):
     if not file.suffix.lower() == '.zip':
         rename_ext(file)
+        file = file.with_suffix('.zip')
     print(f"Extracting replay file: {file}")
     with zipfile.ZipFile(file, 'r') as zip_ref:
         zip_ref.extractall(file.parent)
@@ -88,6 +89,7 @@ def process_replay_files(data: dict) -> RawReplayData:
         title=data["item"]["title"],
         mod=extract_mod(data["item"]["tags"]),
         level=data["item"]["level"],
+        rating=data["item"]["level"]["rating"],
         difficulty=data["item"]["level"]["tags"][0]["title"][1:],
         engine=data["item"]['level']["engine"],
         thumbnail=data["item"]['level']["engine"]["thumbnail"]["url"],
@@ -104,10 +106,23 @@ def decompress_gzip_file(input_file_path, output_file_path):
     with gzip.open(input_file_path, 'rt') as data:
         jsonlines = [json.loads(line) for line in data]
 
-    with open(f"{output_file_path / input_file_path.name}.json", 'w') as output_file:
+    file = f"{output_file_path / input_file_path.name}.json"
+    with open(file, 'w') as output_file:
         json.dump(jsonlines, output_file, indent=2)
+        print("Decompressed file saved to:", output_file_path)
 
-    print("Decompressed file saved to:", output_file_path)
+    return file
+
+def read_replay_data_file(file: pathlib.Path) -> list | None:
+    if not file.exists():
+        print(f"File {file} does not exist.")
+        return None
+    with open(file, "r") as f:
+        data = json.load(f)
+    return data
+
+def parse_replay_data(metadata: RawReplayData, data: dict) -> ReplayData:
+    return ReplayData.from_dict(metadata, data)
 
 def main(filters: list = None):
     global processed
@@ -124,16 +139,23 @@ def main(filters: list = None):
             except Exception as e:
                 print(f"Error processing {file}: {e}")
 
+# debug
 if __name__ == '__main__':
     f = pathlib.Path("./test-v2.zip")
     decompress_folder = pathlib.Path("Export")
     decompress_folder.mkdir(parents=True, exist_ok=True)
-    data = extract_replay(f)
+    if not f.exists():
+        print(f"File {f} does not exist.")
+        exit(1)
 
-    jsondata = read_replay_data(data)
 
+    # Currently, this does not process many files, plan later!.
+    data = extract_replay(f) # TEST OK
+    jsondata = read_replay_data(data) # TEST OK
     replay_data = process_replay_files(jsondata)
-    gp_data  = pathlib.Path("." + replay_data.gameplay_data)
-    decompress_gzip_file(gp_data, decompress_folder)
+    gameplay_data_raw  = pathlib.Path("." + replay_data.gameplay_data) # TEST OK
+    file_replay = decompress_gzip_file(gameplay_data_raw, decompress_folder) # TEST OK
+    replay_data_rel = read_replay_data_file(pathlib.Path(file_replay)) # TEST OK
+    test_data = parse_replay_data(replay_data, replay_data_rel[0]) # TEST OK
 
-    print(json.dumps(replay_data.dump(), indent=2))
+    print(test_data.to_dict())
