@@ -6,7 +6,6 @@ from pathlib import Path
 from utils import *
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
-import json
 
 class Client(FastAPI):
     def __init__(self):
@@ -34,13 +33,20 @@ class Client(FastAPI):
             shutil.rmtree(f)
             print("Cleaning up success")
 
+    def raise_error(self, code, message) -> None:
+        """
+        Raise an HTTPException with a given code and message.
+        """
+        raise HTTPException(status_code=code, detail=message)
+
     async def send_replay(self, file: UploadFile = File(...)):
         """
         Endpoint to receive a replay file and return its UUID.
         """
         print(f"Received file: {file.filename}")
         if not file.filename.endswith('.zip') and not file.filename.endswith(".scp"):
-            raise HTTPException(status_code=400, detail="File must be a zip or a vaild sonolus collection archive.")
+            self.raise_error(code=400, message="File must be a zip or a vaild sonolus collection archive.")
+            return
 
         session_uuid = self.generate_uuid()
         file_location = Path(f"temp/{session_uuid}/")
@@ -55,18 +61,27 @@ class Client(FastAPI):
         f = next(file_location.glob("*.scp"), None)
         if f is None:
             self.clean_up(file_location)
-            raise HTTPException(status_code=502, detail="Replay file not found in the uploaded archive.")
+            self.raise_error(code=502, message="Replay file not found in the uploaded archive.")
+            return
 
         data = extract_replay(f)
         jsondata = read_replay_data(data)
-        replay_data = process_replay_files(jsondata)
-        gameplay_data_raw = Path("." + replay_data.gameplay_data)
-        if not gameplay_data_raw.exists():
-            self.clean_up(file_location)
-            raise HTTPException(status_code=502, detail="Gameplay data file not found in the uploaded archive.")
-        file_replay = decompress_gzip_file(gameplay_data_raw, file_location)
-        replay_data_rel = read_replay_data_file(Path(file_replay))
 
+        if not jsondata:
+            self.clean_up(file_location)
+            self.raise_error(code=400, message="Replay data not found in the uploaded archive.")
+            return
+
+        replay_data = process_replay_files(jsondata)
+        gameplay_data_gzip = Path("." + replay_data.gameplay_data)
+
+        if not gameplay_data_gzip.exists():
+            self.clean_up(file_location)
+            self.raise_error(code=400, message="Gameplay data file not found in the uploaded archive.")
+            return
+
+        file_replay = decompress_gzip_file(gameplay_data_gzip, file_location)
+        replay_data_rel = read_replay_data_file(Path(file_replay))
         final_data = parse_replay_data(replay_data, replay_data_rel[0])
 
         # Clean up the temporary files

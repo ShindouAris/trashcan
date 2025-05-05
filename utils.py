@@ -78,6 +78,8 @@ def extract_replay(file: pathlib.Path):
 def read_replay_data(folder: pathlib.Path):
     replay_folder = folder / "replays"
     for file in replay_folder.glob("local-*"):
+        if not file.exists():
+            return None
         with open(file, "r") as f:
             data = json.load(f)
         return data
