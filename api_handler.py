@@ -81,6 +81,12 @@ class Client(FastAPI):
             return
 
         file_replay = decompress_gzip_file(gameplay_data_gzip, file_location)
+
+        if not file_replay:
+            self.clean_up(file_location)
+            self.raise_error(code=400, message="Failed to decompress / search for replay data.")
+            return
+
         replay_data_rel = read_replay_data_file(Path(file_replay))
         final_data = parse_replay_data(replay_data, replay_data_rel[0])
 

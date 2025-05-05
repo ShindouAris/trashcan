@@ -105,6 +105,8 @@ def decompress_gzip_file(input_file_path, output_file_path):
     :param input_file_path: Path to the input gzip file.
     :param output_file_path: Path to save the decompressed file.
     """
+    if not input_file_path.exists():
+        return None
     with gzip.open(input_file_path, 'rt') as data:
         jsonlines = [json.loads(line) for line in data]
 
