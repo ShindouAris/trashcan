@@ -28,6 +28,12 @@ class Client(FastAPI):
         """
         return str(uuid.uuid4())
 
+    @staticmethod
+    def clean_up(f: Path):
+        if f.exists() and f.is_dir():
+            shutil.rmtree(f)
+            print("Cleaning up success")
+
     async def send_replay(self, file: UploadFile = File(...)):
         """
         Endpoint to receive a replay file and return its UUID.
@@ -48,10 +54,9 @@ class Client(FastAPI):
 
         f = next(file_location.glob("*.scp"), None)
         if f is None:
-            f = next(file_location.glob("*.zip"), None)
-            if f is None:
-                self.clean_up(file_location)
-                raise HTTPException(status_code=502, detail="Replay file not found in the uploaded archive.")
+            self.clean_up(file_location)
+            raise HTTPException(status_code=502, detail="Replay file not found in the uploaded archive.")
+
         data = extract_replay(f)
         jsondata = read_replay_data(data)
         replay_data = process_replay_files(jsondata)
@@ -65,19 +70,11 @@ class Client(FastAPI):
         final_data = parse_replay_data(replay_data, replay_data_rel[0])
 
         # Clean up the temporary files
-        for file in file_location.glob("*.zip"):
-            file.unlink()
-        if file_location.exists() and file_location.is_dir():
-            shutil.rmtree(file_location)
+        self.clean_up(file_location)
 
-        print("Replay data processed successfully.")
-        print("Replay data:", final_data.to_dict()) # Debugging line
         return JSONResponse(content=final_data.to_dict())
 
-    def clean_up(self, f: Path):
-        if f.exists() and f.is_dir():
-            shutil.rmtree(f)
-            print("Cleaning up success")
+
 
 if __name__ == '__main__':
     app = Client()
