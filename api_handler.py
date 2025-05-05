@@ -50,12 +50,14 @@ class Client(FastAPI):
         if f is None:
             f = next(file_location.glob("*.zip"), None)
             if f is None:
+                self.clean_up(file_location)
                 raise HTTPException(status_code=502, detail="Replay file not found in the uploaded archive.")
         data = extract_replay(f)
         jsondata = read_replay_data(data)
         replay_data = process_replay_files(jsondata)
         gameplay_data_raw = Path("." + replay_data.gameplay_data)
         if not gameplay_data_raw.exists():
+            self.clean_up(file_location)
             raise HTTPException(status_code=502, detail="Gameplay data file not found in the uploaded archive.")
         file_replay = decompress_gzip_file(gameplay_data_raw, file_location)
         replay_data_rel = read_replay_data_file(Path(file_replay))
@@ -71,6 +73,11 @@ class Client(FastAPI):
         print("Replay data processed successfully.")
         print("Replay data:", final_data.to_dict()) # Debugging line
         return JSONResponse(content=final_data.to_dict())
+
+    def clean_up(self, f: Path):
+        if f.exists() and f.is_dir():
+            shutil.rmtree(f)
+            print("Cleaning up success")
 
 if __name__ == '__main__':
     app = Client()
