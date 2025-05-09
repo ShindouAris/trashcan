@@ -94,7 +94,7 @@ def process_replay_files(data: dict) -> RawReplayData:
         rating=data["item"]["level"]["rating"],
         difficulty=data["item"]["level"]["tags"][0]["title"][1:],
         engine=data["item"]['level']["engine"],
-        thumbnail=data["item"]['level']["engine"]["thumbnail"]["url"],
+        thumbnail=data["item"]['level']["engine"]["thumbnail"].get("url", ""),
         gameplay_data=data["item"]["data"]["url"]
     )
 

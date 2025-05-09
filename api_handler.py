@@ -13,10 +13,10 @@ class Client(FastAPI):
         origins = ["http://localhost:63342"]
         self.add_middleware(
             CORSMiddleware,
-            allow_origins=origins, # List of allowed origins
-            allow_credentials=True, # Allow cookies if needed (usually yes)
-            allow_methods=["*"],    # Allow all standard methods (GET, POST, etc.)
-            allow_headers=["*"],    # Allow all standard headers
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
         )
         self.add_api_route("/replay", self.send_replay, methods=["POST"])
 
@@ -98,8 +98,7 @@ class Client(FastAPI):
 
 
 if __name__ == '__main__':
-    app = Client()
     print("Starting server on http://localhost:8000/replay")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(Client, host="0.0.0.0", port=8000, log_level="info")
 
 
