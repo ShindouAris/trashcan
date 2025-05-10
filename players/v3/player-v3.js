@@ -16,8 +16,6 @@ const currentTimeElement = document.getElementById('current-time');
 const totalDurationElement = document.getElementById('total-duration');
 const currentComboElement = document.getElementById('current-combo');
 const maxComboElement = document.getElementById('max-combo');
-const judgmentLogContainer = document.getElementById('judgment-log');
-const judgmentLogWrapper = document.getElementById('judgment-log-container');
 const visualizerWrapper = document.getElementById('visualizer-container');
 const canvas = document.getElementById('accuracy-visualizer');
 const ctx = canvas.getContext('2d');
@@ -35,11 +33,24 @@ let combo = 0; maxCombo = 0;
 let perfectCount = 0; greatCount = 0; goodCount = 0; missCount = 0;
 let duration = 0;
 let activeLines = [];
+const judgmentVizColorMap = { 0: "#e74c3c", 1: "#00a6ff", 2: "#3498db", 3: "#f1c40f", default: "#95a5a6" };
 
-const judgmentMap = { 0: "Miss", 1: "Perfect", 2: "Great", 3: "Good" };
-const judgmentLogClassMap = { 0: "log-miss", 1: "log-perfect", 2: "log-great", 3: "log-good" };
-const judgmentVizColorMap = { 0: "#e74c3c", 1: "#00FFFF", 2: "#3498db", 3: "#f1c40f", default: "#95a5a6" };
 const VISUALIZER_ACCURACY_RANGE = 0.15;
+
+const ACCURACY_THRESHOLDS = {
+    PERFECT: 0.043,
+    GREAT:   0.083,
+    GOOD:    0.128,
+    MISS:   0.130
+};
+
+const ACCURACY_BAR_COLORS = {
+    PERFECT: "#b7ecec",
+    GREAT:   "#90EE90",
+    GOOD:    "#FFD700",
+    MISS:    "#FF0000"
+};
+
 const LINE_FADE_DURATION_MS = 3000;
 
 function decodeDelta(deltaArray) {
@@ -59,12 +70,45 @@ function updateStatus(message, isError = false) {
 function mapAccuracyToX(accuracy, canvasWidth, maxAbsAccuracy) {
     const normalized = (accuracy + maxAbsAccuracy) / (2 * maxAbsAccuracy); const clamped = Math.max(0, Math.min(1, normalized)); return clamped * canvasWidth;
 }
-
 function drawVisualizerBackground() {
-    if (canvas.width !== canvas.clientWidth) { canvas.width = canvas.clientWidth; }
-    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#333'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const centerX = canvas.width / 2; ctx.beginPath(); ctx.moveTo(centerX, 0); ctx.lineTo(centerX, canvas.height);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.stroke();
+    if (canvas.width !== canvas.clientWidth) {
+        canvas.width = canvas.clientWidth;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000'; // Black background, as in the image
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const maxDisplayTimeOffset = VISUALIZER_ACCURACY_RANGE;
+
+    ctx.fillStyle = ACCURACY_BAR_COLORS.MISS;
+    let x_start_miss = mapAccuracyToX(-maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    let x_end_miss = mapAccuracyToX(maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    ctx.fillRect(x_start_miss, 0, x_end_miss - x_start_miss, canvasHeight);
+
+    ctx.fillStyle = ACCURACY_BAR_COLORS.GOOD;
+    let x_start_good = mapAccuracyToX(-maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    let x_end_good = mapAccuracyToX(maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    ctx.fillRect(x_start_good, 0, x_end_good - x_start_good, canvasHeight);
+
+    ctx.fillStyle = ACCURACY_BAR_COLORS.GREAT;
+    let x_start_great = mapAccuracyToX(-ACCURACY_THRESHOLDS.GREAT, canvasWidth, maxDisplayTimeOffset);
+    let x_end_great = mapAccuracyToX(ACCURACY_THRESHOLDS.GREAT, canvasWidth, maxDisplayTimeOffset);
+    ctx.fillRect(x_start_great, 0, x_end_great - x_start_great, canvasHeight);
+
+    ctx.fillStyle = ACCURACY_BAR_COLORS.PERFECT;
+    let x_start_perfect = mapAccuracyToX(-ACCURACY_THRESHOLDS.PERFECT, canvasWidth, maxDisplayTimeOffset);
+    let x_end_perfect = mapAccuracyToX(ACCURACY_THRESHOLDS.PERFECT, canvasWidth, maxDisplayTimeOffset);
+    ctx.fillRect(x_start_perfect, 0, x_end_perfect - x_start_perfect, canvasHeight);
+
+    const centerX = canvasWidth / 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, 0);
+    ctx.lineTo(centerX, canvasHeight);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 }
 
 /**
@@ -88,7 +132,6 @@ function resetSimulation(isInitial = false) {
     songDifficultyElement.textContent = 'N/A'; songRatingElement.textContent = 'N/A';
 
     displayElement.style.display = 'none';
-    judgmentLogWrapper.style.display = 'none'; judgmentLogContainer.innerHTML = '';
     visualizerWrapper.style.display = 'none';
     if (ctx) drawVisualizerBackground();
 
@@ -147,7 +190,8 @@ uploadButton.addEventListener('click', async () => {
 
         fullBackendData = await response.json();
         updateStatus('Processing response...');
-        updateStatus("Gotten response from backend. Processing data..." + fullBackendData.metadata.mod);
+        console.log("Backend response received:", fullBackendData);
+
 
         if (!fullBackendData || !fullBackendData.replay || !fullBackendData.replay.inputs || !fullBackendData.replay.duration) {
             throw new Error("Invalid response structure from backend. Missing required replay data.");
@@ -169,7 +213,6 @@ uploadButton.addEventListener('click', async () => {
         const judgments = inputs.judgment;
         const accuracies = inputs.accuracy;
 
-        // Truncate arrays if lengths mismatch (safety check)
         let minLen = Math.min(decodedTimes.length, judgments.length, accuracies.length);
         if (decodedTimes.length !== judgments.length || decodedTimes.length !== accuracies.length) {
             const lenMsg = `Mismatched lengths after processing! T:${decodedTimes.length}, J:${judgments.length}, A:${accuracies.length}. Truncating to ${minLen}.`;
@@ -189,21 +232,21 @@ uploadButton.addEventListener('click', async () => {
         const metadata = fullBackendData.metadata;
         if (metadata) {
             songTitleElement.textContent = metadata.title || 'N/A';
-            songArtistElement.textContent = metadata.mod || 'N/A';
+            songArtistElement.textContent = metadata.mod || 'NO-MOD';
             songDifficultyElement.textContent = metadata.difficulty || 'N/A';
             songRatingElement.textContent = metadata.rating != null ? metadata.rating : 'N/A';
         }
 
         totalDurationElement.textContent = duration.toFixed(2);
         displayElement.style.display = 'block';
-        judgmentLogWrapper.style.display = 'block';
         visualizerWrapper.style.display = 'block';
         drawVisualizerBackground();
 
         startButton.disabled = false;
         uploadButton.disabled = false;
         fileUploadInput.disabled = false;
-        updateStatus(`Replay data processed successfully for "${metadata?.level?.title || file.name}". Ready to start simulation.`);
+        updateStatus(`Replay data processed successfully for "${metadata?.title || file.name}". Ready to start simulation.`);
+
 
     } catch (error) {
         updateStatus(`Error: ${error.message}`, true);
@@ -229,7 +272,6 @@ startButton.addEventListener('click', () => {
     goodCountElement.textContent = '0'; missCountElement.textContent = '0';
     currentComboElement.textContent = '0'; maxComboElement.textContent = '0';
     currentTimeElement.textContent = '0.000';
-    judgmentLogContainer.innerHTML = '';
     drawVisualizerBackground();
 
     simulationRunning = true;
@@ -257,44 +299,59 @@ function simulationStep(timestamp) {
             case 0: combo = 0; missCount++; missCountElement.textContent = missCount; break;
             case 1: combo++; perfectCount++; perfectCountElement.textContent = perfectCount; break;
             case 2: combo++; greatCount++; greatCountElement.textContent = greatCount; break;
-            case 3: combo = 0; goodCount++; goodCountElement.textContent = goodCount; break;
+            case 3: combo = 0; goodCount++; goodCountElement.textContent = goodCount; break; // Good breaks combo in some games
         }
         maxCombo = Math.max(maxCombo, combo);
         currentComboElement.textContent = combo; maxComboElement.textContent = maxCombo;
-
-        const logEntry = document.createElement('div');
-        logEntry.classList.add('log-entry'); const judgmentText = judgmentMap[judgVal] ?? "Unknown";
-        const logClass = judgmentLogClassMap[judgVal] ?? "log-unknown"; logEntry.classList.add(logClass);
-        const timeStr = eventTime.toFixed(3).padStart(7); const accStr = (accuracy >= 0 ? '+' : '') + Number(accuracy).toFixed(4);
-        logEntry.textContent = `T: ${timeStr}s - ${judgmentText} (Acc: ${accStr})`;
-        judgmentLogContainer.appendChild(logEntry); judgmentLogContainer.scrollTop = judgmentLogContainer.scrollHeight;
-
         const xPos = mapAccuracyToX(accuracy, canvas.width, VISUALIZER_ACCURACY_RANGE);
         const vizColor = judgmentVizColorMap[judgVal] ?? judgmentVizColorMap.default;
-        activeLines.push({ x: xPos, color: vizColor, addedTime: now });
+        activeLines.push({ x: xPos, color: vizColor, addedTime: now, judgment: judgVal });
         nextEventIndex++;
     }
 
     drawVisualizerBackground();
     const remainingLines = [];
+    ctx.shadowBlur = 0;
+
     for (const line of activeLines) {
         const age = now - line.addedTime;
         if (age < LINE_FADE_DURATION_MS) {
             const opacity = Math.max(0, 1.0 - (age / LINE_FADE_DURATION_MS));
-            ctx.globalAlpha = opacity; ctx.strokeStyle = line.color; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(line.x, 0); ctx.lineTo(line.x, canvas.height); ctx.stroke();
+            ctx.globalAlpha = opacity;
+            ctx.strokeStyle = line.color;
+
+            if (line.judgment === 1) {
+                ctx.lineWidth = 4;
+                ctx.shadowColor = line.color;
+                ctx.shadowBlur = 5;
+            }
+            else if (line.judgment === 5) {
+                ctx.lineWidth = 3;
+                ctx.shadowColor = line.color;
+                ctx.shadowBlur = 3;
+            }
+            else {
+                ctx.lineWidth = 2;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(line.x, 0);
+            ctx.lineTo(line.x, canvas.height);
+            ctx.stroke();
             remainingLines.push(line);
         }
     }
     activeLines = remainingLines;
     ctx.globalAlpha = 1.0;
+    ctx.shadowBlur = 0;
+
 
     const buffer = 0.1;
     if (currentReplayTime >= (duration + buffer) && nextEventIndex >= processedInputs.length) {
         simulationRunning = false;
         updateStatus(`Simulation finished. Final Max Combo: ${maxCombo}. Select another file or upload again.`);
-        startButton.disabled = true; // Keep start disabled until new data loaded
-        uploadButton.disabled = false; fileInput.disabled = false; // Re-enable upload
+        startButton.disabled = true;
+        uploadButton.disabled = false; fileUploadInput.disabled = false;
         currentTimeElement.textContent = duration.toFixed(3);
     } else {
         animationFrameId = requestAnimationFrame(simulationStep);

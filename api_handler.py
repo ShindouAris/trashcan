@@ -10,7 +10,7 @@ import shutil
 class Client(FastAPI):
     def __init__(self):
         super().__init__()
-        origins = ["http://localhost:63342"]
+        origins = ["*"]
         self.add_middleware(
             CORSMiddleware,
             allow_origins=origins,
