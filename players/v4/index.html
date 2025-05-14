@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replay Viewer V2</title> <!-- Đổi title nếu muốn -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Replay Viewer V2</h1>
+
+<div id="controls">
+    <label for="replayUploadFile">Select Replay File (.zip or .scp):</label>
+    <input type="file" id="replayUploadFile" accept=".zip,.scp">
+    <button id="uploadButton">Upload & Process</button>
+    <!-- Nút Start Simulation sẽ được kích hoạt sau khi chọn replay -->
+</div>
+
+<!-- Container cho bộ chọn replay -->
+<div id="replay-selector-container" style="display: none; margin-bottom: 15px;">
+    <!-- Dropdown sẽ được tạo ở đây bằng JavaScript -->
+</div>
+
+<div id="status">
+    <p>Please select a replay file (.zip or .scp) and click "Upload & Process".</p>
+</div>
+
+<div id="display" style="display: none;">
+    <div id="song-info">
+        <span>Title: <strong id="song-title">N/A</strong></span>
+        <span>Mod(s): <strong id="song-artist">N/A</strong></span> <!-- Đổi label từ Artist sang Mod(s) -->
+        <span>Difficulty: <strong id="song-difficulty">N/A</strong></span>
+        <span>Rating: <strong id="song-rating">N/A</strong></span>
+    </div>
+    <h2>Live Counts & Progress</h2>
+    <div id="counts">
+        <div class="count-item"><strong id="perfect-count">0</strong><span>Perfects</span></div>
+        <div class="count-item"><strong id="great-count">0</strong><span>Greats</span></div>
+        <div class="count-item"><strong id="good-count">0</strong><span>Goods</span></div>
+        <div class="count-item"><strong id="miss-count">0</strong><span>Misses</span></div>
+    </div>
+    <div id="progress-info">
+        <span>Time: <span id="current-time">0.000</span>s / <span id="total-duration">0.00</span>s</span>
+        <span>Combo: <span id="current-combo">0</span></span>
+        <span>Max Combo: <span id="max-combo">0</span></span>
+    </div>
+    <div id="visualizer-container" style="display: none;">
+        <h2>Accuracy Visualizer</h2>
+        <canvas id="accuracy-visualizer" width="600" height="50"></canvas>
+    </div>
+    <button id="startButton" disabled style="display: block; margin-top: 15px;">Start Simulation</button>
+</div>
+
+
+<script src="player-v4.js"></script> <!-- Đảm bảo tên file JS đúng -->
+
+</body>
+</html>

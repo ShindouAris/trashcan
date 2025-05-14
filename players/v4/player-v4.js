@@ -3,6 +3,7 @@ const uploadButton = document.getElementById('uploadButton');
 const startButton = document.getElementById('startButton');
 const statusElement = document.getElementById('status').querySelector('p');
 const displayElement = document.getElementById('display');
+const replaySelectorContainer = document.getElementById('replay-selector-container');
 
 const songTitleElement = document.getElementById('song-title');
 const songArtistElement = document.getElementById('song-artist');
@@ -20,38 +21,27 @@ const visualizerWrapper = document.getElementById('visualizer-container');
 const canvas = document.getElementById('accuracy-visualizer');
 const ctx = canvas.getContext('2d');
 
-const BACKEND_UPLOAD_URL = 'http://192.168.1.10:8000/replayv1';
+const BACKEND_UPLOAD_URL = 'http://192.168.1.10:8000/replayv2';
 
-
-let fullBackendData = null; // Store the entire response
+let allReplaysData = null;
+let currentReplayKey = null;
+let currentReplayData = null;
 let processedInputs = [];
 let simulationRunning = false;
 let animationFrameId = null;
 let simulationStartTimeMs = 0;
 let nextEventIndex = 0;
-let combo = 0; maxCombo = 0;
-let perfectCount = 0; greatCount = 0; goodCount = 0; missCount = 0;
+let combo = 0, maxCombo = 0;
+let perfectCount = 0, greatCount = 0, goodCount = 0, missCount = 0;
 let duration = 0;
 let activeLines = [];
 const judgmentVizColorMap = { 0: "#e74c3c", 1: "#00a6ff", 2: "#3498db", 3: "#f1c40f", default: "#95a5a6" };
 
 const VISUALIZER_ACCURACY_RANGE = 0.15;
-
-const ACCURACY_THRESHOLDS = {
-    PERFECT: 0.043,
-    GREAT:   0.083,
-    GOOD:    0.128,
-    MISS:   0.130
-};
-
-const ACCURACY_BAR_COLORS = {
-    PERFECT: "#b7ecec",
-    GREAT:   "#90EE90",
-    GOOD:    "#FFD700",
-    MISS:    "#FF0000"
-};
-
+const ACCURACY_THRESHOLDS = { PERFECT: 0.043, GREAT: 0.083, GOOD: 0.128, MISS: 0.130 };
+const ACCURACY_BAR_COLORS = { PERFECT: "#b7ecec", GREAT: "#90EE90", GOOD: "#FFD700", MISS: "#FF0000" };
 const LINE_FADE_DURATION_MS = 3000;
+
 
 function decodeDelta(deltaArray) {
     if (!Array.isArray(deltaArray)) { console.warn(`Invalid delta time format.`); updateStatus(`Error: Invalid delta time format.`, true); return []; }
@@ -70,12 +60,14 @@ function updateStatus(message, isError = false) {
 function mapAccuracyToX(accuracy, canvasWidth, maxAbsAccuracy) {
     const normalized = (accuracy + maxAbsAccuracy) / (2 * maxAbsAccuracy); const clamped = Math.max(0, Math.min(1, normalized)); return clamped * canvasWidth;
 }
+
 function drawVisualizerBackground() {
-    if (canvas.width !== canvas.clientWidth) {
+    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
         canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000000'; // Black background, as in the image
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const canvasWidth = canvas.width;
@@ -83,13 +75,13 @@ function drawVisualizerBackground() {
     const maxDisplayTimeOffset = VISUALIZER_ACCURACY_RANGE;
 
     ctx.fillStyle = ACCURACY_BAR_COLORS.MISS;
-    let x_start_miss = mapAccuracyToX(-maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
-    let x_end_miss = mapAccuracyToX(maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
-    ctx.fillRect(x_start_miss, 0, x_end_miss - x_start_miss, canvasHeight);
+    let x_start_miss_outer = mapAccuracyToX(-maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    let x_end_miss_outer = mapAccuracyToX(maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    ctx.fillRect(x_start_miss_outer, 0, x_end_miss_outer - x_start_miss_outer, canvasHeight);
 
     ctx.fillStyle = ACCURACY_BAR_COLORS.GOOD;
-    let x_start_good = mapAccuracyToX(-maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
-    let x_end_good = mapAccuracyToX(maxDisplayTimeOffset, canvasWidth, maxDisplayTimeOffset);
+    let x_start_good = mapAccuracyToX(-ACCURACY_THRESHOLDS.GOOD, canvasWidth, maxDisplayTimeOffset);
+    let x_end_good = mapAccuracyToX(ACCURACY_THRESHOLDS.GOOD, canvasWidth, maxDisplayTimeOffset);
     ctx.fillRect(x_start_good, 0, x_end_good - x_start_good, canvasHeight);
 
     ctx.fillStyle = ACCURACY_BAR_COLORS.GREAT;
@@ -112,12 +104,13 @@ function drawVisualizerBackground() {
 }
 
 /**
- * Resets all simulation state and UI elements.
+ * Resets state related to a single replay simulation, but keeps allReplaysData.
  */
-function resetSimulation(isInitial = false) {
+function resetCurrentReplayState() {
     if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
     simulationRunning = false;
-    fullBackendData = null;
+    currentReplayKey = null;
+    currentReplayData = null;
     processedInputs = [];
     nextEventIndex = 0; combo = 0; maxCombo = 0;
     perfectCount = 0; greatCount = 0; goodCount = 0; missCount = 0;
@@ -136,8 +129,20 @@ function resetSimulation(isInitial = false) {
     if (ctx) drawVisualizerBackground();
 
     startButton.disabled = true;
+}
+
+/**
+ * Resets everything, including wiping the list of loaded replays.
+ */
+function resetAll(isInitial = false) {
+    resetCurrentReplayState();
+    allReplaysData = null;
+    replaySelectorContainer.innerHTML = '';
+    replaySelectorContainer.style.display = 'none';
+
     uploadButton.disabled = false;
     fileUploadInput.disabled = false;
+
     if (isInitial) {
         updateStatus('Please select a replay file (.zip or .scp) and click "Upload & Process".');
     } else {
@@ -145,14 +150,12 @@ function resetSimulation(isInitial = false) {
     }
 }
 
-
 uploadButton.addEventListener('click', async () => {
     const file = fileUploadInput.files[0];
     if (!file) {
         updateStatus('No file selected. Please select a .zip or .scp file.', true);
         return;
     }
-
     const allowedTypes = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'];
     const allowedExtensions = ['.zip', '.scp'];
     const fileExtension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
@@ -163,12 +166,10 @@ uploadButton.addEventListener('click', async () => {
         return;
     }
 
-
-    resetSimulation();
+    resetAll();
     updateStatus(`Uploading "${file.name}"...`);
     uploadButton.disabled = true;
     fileUploadInput.disabled = true;
-    startButton.disabled = true;
 
     const formData = new FormData();
     formData.append('file', file);
@@ -180,87 +181,170 @@ uploadButton.addEventListener('click', async () => {
         });
 
         if (!response.ok) {
-            let errorMsg = `Upload failed with status: ${response.status} ${response.statusText}`;
-            try {
-                const errorData = await response.json();
-                errorMsg += ` - ${errorData.message || JSON.stringify(errorData)}`;
-            } catch (e) {  }
+            let errorMsg = `Upload failed: ${response.status} ${response.statusText}`;
+            try { const errorData = await response.json(); errorMsg += ` - ${errorData.detail || JSON.stringify(errorData)}`; }
+            catch (e) { /* ignore */ }
             throw new Error(errorMsg);
         }
 
-        fullBackendData = await response.json();
-        updateStatus('Processing response...');
-        console.log("Backend response received:", fullBackendData);
+        allReplaysData = await response.json();
+        console.log("Backend response (all replays):", allReplaysData);
 
-
-        if (!fullBackendData || !fullBackendData.replay || !fullBackendData.replay.inputs || !fullBackendData.replay.duration) {
-            throw new Error("Invalid response structure from backend. Missing required replay data.");
+        if (typeof allReplaysData !== 'object' || allReplaysData === null || Object.keys(allReplaysData).length === 0) {
+            throw new Error("Invalid or empty response structure from backend. Expected a dictionary of replays.");
         }
 
-        const replay = fullBackendData.replay;
-        const inputs = replay.inputs;
-        duration = replay.duration;
-
-        if (!inputs.time || !inputs.judgment || !inputs.accuracy) {
-            throw new Error("Backend response missing time, judgment, or accuracy arrays in replay.inputs.");
+        let hasValidReplay = false;
+        for (const key in allReplaysData) {
+            if (allReplaysData[key] && !allReplaysData[key].error) {
+                hasValidReplay = true;
+                break;
+            }
+        }
+        if (!hasValidReplay) {
+            const firstErrorKey = Object.keys(allReplaysData)[0];
+            const errorDetail = allReplaysData[firstErrorKey]?.error || "Unknown processing error for all items.";
+            throw new Error(`All replay items in the archive failed to process. First error: ${errorDetail}`);
         }
 
-        const decodedTimes = decodeDelta(inputs.time);
-        if (!decodedTimes) {
-            throw new Error("Failed to decode delta times.");
-        }
-
-        const judgments = inputs.judgment;
-        const accuracies = inputs.accuracy;
-
-        let minLen = Math.min(decodedTimes.length, judgments.length, accuracies.length);
-        if (decodedTimes.length !== judgments.length || decodedTimes.length !== accuracies.length) {
-            const lenMsg = `Mismatched lengths after processing! T:${decodedTimes.length}, J:${judgments.length}, A:${accuracies.length}. Truncating to ${minLen}.`;
-            console.warn(lenMsg); updateStatus(`Warning: ${lenMsg}`, false);
-            if (minLen === 0) { throw new Error("No consistent events after truncation."); }
-            const truncatedTimes = decodedTimes.slice(0, minLen);
-            const truncatedJudgments = judgments.slice(0, minLen);
-            const truncatedAccuracies = accuracies.slice(0, minLen);
-            processedInputs = truncatedTimes.map((time, i) => ({ index: i, time: time, judgment: truncatedJudgments[i], accuracy: truncatedAccuracies[i] }));
-        } else {
-            processedInputs = decodedTimes.map((time, i) => ({ index: i, time: time, judgment: judgments[i], accuracy: accuracies[i] }));
-        }
-
-        if (processedInputs.length === 0) { throw new Error("No input events to process."); }
-        processedInputs.sort((a, b) => a.time - b.time);
-
-        const metadata = fullBackendData.metadata;
-        if (metadata) {
-            songTitleElement.textContent = metadata.title || 'N/A';
-            songArtistElement.textContent = metadata.mod || 'NO-MOD';
-            songDifficultyElement.textContent = metadata.difficulty || 'N/A';
-            songRatingElement.textContent = metadata.rating != null ? metadata.rating : 'N/A';
-        }
-
-        totalDurationElement.textContent = duration.toFixed(2);
-        displayElement.style.display = 'block';
-        visualizerWrapper.style.display = 'block';
-        drawVisualizerBackground();
-
-        startButton.disabled = false;
-        uploadButton.disabled = false;
-        fileUploadInput.disabled = false;
-        updateStatus(`Replay data processed successfully for "${metadata?.title || file.name}". Ready to start simulation.`);
+        populateReplaySelector(allReplaysData);
+        replaySelectorContainer.style.display = 'block';
+        updateStatus(`Archive processed. Please select a replay to view.`);
 
 
     } catch (error) {
         updateStatus(`Error: ${error.message}`, true);
-        console.error("Upload or processing error:", error);
-        resetSimulation();
+        console.error("Upload or initial processing error:", error);
+        resetAll();
+    } finally {
         uploadButton.disabled = false;
         fileUploadInput.disabled = false;
-        startButton.disabled = true;
     }
 });
 
+function populateReplaySelector(replays) {
+    replaySelectorContainer.innerHTML = '';
+
+    const selectLabel = document.createElement('label');
+    selectLabel.htmlFor = 'replay-select-dropdown';
+    selectLabel.textContent = 'Select Replay: ';
+    replaySelectorContainer.appendChild(selectLabel);
+
+    const select = document.createElement('select');
+    select.id = 'replay-select-dropdown';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = "";
+    defaultOption.textContent = "-- Choose a replay --";
+    defaultOption.disabled = true;
+    defaultOption.selected = true;
+    select.appendChild(defaultOption);
+
+    for (const replayKey in replays) {
+        const replayItem = replays[replayKey];
+        if (replayItem && !replayItem.error) {
+            const option = document.createElement('option');
+            option.value = replayKey;
+            const displayName = replayItem.metadata?.title || replayKey;
+            option.textContent = displayName;
+            select.appendChild(option);
+        } else if (replayItem && replayItem.error) {
+            console.warn(`Skipping replay item ${replayKey} due to error: ${replayItem.error}`);
+            const errorOption = document.createElement('option');
+            errorOption.value = replayKey;
+            errorOption.textContent = `(Error) ${replayKey.split('.')[0]}: ${replayItem.error.substring(0,30)}...`;
+            errorOption.disabled = true;
+        }
+    }
+
+    select.addEventListener('change', (event) => {
+        const selectedKey = event.target.value;
+        if (selectedKey && allReplaysData[selectedKey] && !allReplaysData[selectedKey].error) {
+            loadSelectedReplayData(selectedKey);
+        } else {
+            resetCurrentReplayState();
+            updateStatus("Please select a valid replay.", true);
+        }
+    });
+
+    replaySelectorContainer.appendChild(select);
+}
+
+function loadSelectedReplayData(replayKey) {
+    resetCurrentReplayState();
+    currentReplayKey = replayKey;
+    currentReplayData = allReplaysData[replayKey];
+
+    if (!currentReplayData || !currentReplayData.replay || !currentReplayData.replay.inputs || currentReplayData.replay.duration == null) {
+        updateStatus(`Error: Invalid data structure for selected replay "${replayKey}". Missing required fields.`, true);
+        console.error("Invalid data for selected replay:", currentReplayData);
+        startButton.disabled = true;
+        return;
+    }
+    updateStatus(`Processing selected replay: "${currentReplayData.metadata?.title || replayKey}"...`);
+
+    const replay = currentReplayData.replay;
+    const inputs = replay.inputs;
+    duration = replay.duration;
+
+    if (!inputs.time || !inputs.judgment || !inputs.accuracy) {
+        updateStatus(`Error: Selected replay "${replayKey}" missing time, judgment, or accuracy arrays.`, true);
+        startButton.disabled = true;
+        return;
+    }
+
+    const decodedTimes = decodeDelta(inputs.time);
+    if (!decodedTimes) {
+        updateStatus(`Error: Failed to decode delta times for replay "${replayKey}".`, true);
+        startButton.disabled = true;
+        return;
+    }
+
+    const judgments = inputs.judgment;
+    const accuracies = inputs.accuracy;
+
+    let minLen = Math.min(decodedTimes.length, judgments.length, accuracies.length);
+    if (decodedTimes.length !== judgments.length || decodedTimes.length !== accuracies.length) {
+        const lenMsg = `Mismatched lengths for "${replayKey}"! T:${decodedTimes.length}, J:${judgments.length}, A:${accuracies.length}. Truncating to ${minLen}.`;
+        console.warn(lenMsg); updateStatus(`Warning: ${lenMsg}`, false);
+        if (minLen === 0) {
+            updateStatus(`Error: No consistent events after truncation for "${replayKey}".`, true);
+            startButton.disabled = true; return;
+        }
+    }
+    const truncatedTimes = decodedTimes.slice(0, minLen);
+    const truncatedJudgments = judgments.slice(0, minLen);
+    const truncatedAccuracies = accuracies.slice(0, minLen);
+    processedInputs = truncatedTimes.map((time, i) => ({ index: i, time: time, judgment: truncatedJudgments[i], accuracy: truncatedAccuracies[i] }));
+
+
+    if (processedInputs.length === 0) {
+        updateStatus(`Error: No input events to process for replay "${replayKey}".`, true);
+        startButton.disabled = true; return;
+    }
+    processedInputs.sort((a, b) => a.time - b.time);
+
+    const metadata = currentReplayData.metadata;
+    if (metadata) {
+        songTitleElement.textContent = metadata.title || 'N/A';
+        songArtistElement.textContent = Array.isArray(metadata.mod) ? metadata.mod.join(', ') : (metadata.mod || 'NO-MOD');
+        songDifficultyElement.textContent = metadata.difficulty || 'N/A';
+        songRatingElement.textContent = metadata.rating != null ? metadata.rating : 'N/A';
+    }
+
+    totalDurationElement.textContent = duration.toFixed(2);
+    displayElement.style.display = 'block';
+    visualizerWrapper.style.display = 'block';
+    drawVisualizerBackground();
+
+    startButton.disabled = false;
+    updateStatus(`Replay "${metadata?.title || replayKey}" loaded. Ready to start simulation.`);
+}
+
+
 startButton.addEventListener('click', () => {
-    if (!processedInputs || processedInputs.length === 0 || simulationRunning) {
-        console.warn("Cannot start simulation: No processed data, or already running.");
+    if (!currentReplayData || !processedInputs || processedInputs.length === 0 || simulationRunning) {
+        console.warn("Cannot start simulation: No replay selected/processed, or already running.");
         return;
     }
 
@@ -278,12 +362,13 @@ startButton.addEventListener('click', () => {
     startButton.disabled = true;
     uploadButton.disabled = true;
     fileUploadInput.disabled = true;
-    updateStatus(`Simulation running...`);
+    document.getElementById('replay-select-dropdown').disabled = true;
+
+    updateStatus(`Simulation running for "${currentReplayData.metadata?.title || currentReplayKey}"...`);
 
     simulationStartTimeMs = performance.now();
     animationFrameId = requestAnimationFrame(simulationStep);
 });
-
 
 function simulationStep(timestamp) {
     if (!simulationRunning) return;
@@ -294,12 +379,12 @@ function simulationStep(timestamp) {
 
     while (nextEventIndex < processedInputs.length && processedInputs[nextEventIndex].time <= currentReplayTime) {
         const event = processedInputs[nextEventIndex];
-        const judgVal = event.judgment; const accuracy = event.accuracy; const eventTime = event.time;
+        const judgVal = event.judgment; const accuracy = event.accuracy;
         switch (judgVal) {
             case 0: combo = 0; missCount++; missCountElement.textContent = missCount; break;
             case 1: combo++; perfectCount++; perfectCountElement.textContent = perfectCount; break;
             case 2: combo++; greatCount++; greatCountElement.textContent = greatCount; break;
-            case 3: combo = 0; goodCount++; goodCountElement.textContent = goodCount; break; // Good breaks combo in some games
+            case 3: combo = 0; goodCount++; goodCountElement.textContent = goodCount; break;
         }
         maxCombo = Math.max(maxCombo, combo);
         currentComboElement.textContent = combo; maxComboElement.textContent = maxCombo;
@@ -312,6 +397,7 @@ function simulationStep(timestamp) {
     drawVisualizerBackground();
     const remainingLines = [];
     ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1.0;
 
     for (const line of activeLines) {
         const age = now - line.addedTime;
@@ -324,14 +410,12 @@ function simulationStep(timestamp) {
                 ctx.lineWidth = 4;
                 ctx.shadowColor = line.color;
                 ctx.shadowBlur = 5;
-            }
-            else if (line.judgment === 5) {
-                ctx.lineWidth = 3;
-                ctx.shadowColor = line.color;
-                ctx.shadowBlur = 3;
-            }
-            else {
+            } else if (line.judgment === 0) {
                 ctx.lineWidth = 2;
+                ctx.shadowBlur = 0;
+            } else {
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 0;
             }
 
             ctx.beginPath();
@@ -345,17 +429,18 @@ function simulationStep(timestamp) {
     ctx.globalAlpha = 1.0;
     ctx.shadowBlur = 0;
 
-
     const buffer = 0.1;
     if (currentReplayTime >= (duration + buffer) && nextEventIndex >= processedInputs.length) {
         simulationRunning = false;
-        updateStatus(`Simulation finished. Final Max Combo: ${maxCombo}. Select another file or upload again.`);
+        updateStatus(`Simulation finished for "${currentReplayData.metadata?.title || currentReplayKey}". Final Max Combo: ${maxCombo}.`);
         startButton.disabled = true;
-        uploadButton.disabled = false; fileUploadInput.disabled = false;
+        uploadButton.disabled = false;
+        fileUploadInput.disabled = false;
+        document.getElementById('replay-select-dropdown').disabled = false;
         currentTimeElement.textContent = duration.toFixed(3);
     } else {
         animationFrameId = requestAnimationFrame(simulationStep);
     }
 }
 
-resetSimulation(true);
+resetAll(true);
