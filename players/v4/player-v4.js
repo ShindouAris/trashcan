@@ -21,7 +21,7 @@ const visualizerWrapper = document.getElementById('visualizer-container');
 const canvas = document.getElementById('accuracy-visualizer');
 const ctx = canvas.getContext('2d');
 
-const BACKEND_UPLOAD_URL = 'http://40.76.122.0:8000/replayv2';
+const BACKEND_UPLOAD_URL = 'https://40.76.122.0:8000/replayv2';
 
 let allReplaysData = null;
 let currentReplayKey = null;
