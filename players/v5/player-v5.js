@@ -34,7 +34,7 @@ const ctx = canvas.getContext('2d');
 const fileNameDisplayElement = document.getElementById('fileNameDisplay');
 const fileSizeDisplayElement = document.getElementById('fileSizeDisplay');
 
-const BACKEND_UPLOAD_URL = 'http://localhost:8000/replayv2';
+const BACKEND_UPLOAD_URL = 'http://192.168.1.8:8000/replayv2';
 
 let allReplaysData = null;
 let currentReplayKey = null;
@@ -267,10 +267,15 @@ uploadButton.addEventListener('click', async () => {
         updateStatus(`Archive processed. Please select a replay to view.`);
 
     } catch (error) {
-        updateStatus(`Error: ${error.message}`, true);
+        if (error.message.includes("Failed to fetch")) {
+            updateStatus("Network error: Unable to reach the server. Please check your connection.", true);
+        }
+        else {
+            updateStatus(`Error: ${error.message}`, true);
+        }
         console.error("Upload or initial processing error:", error);
-        resetAll();
     } finally {
+        // resetAll();
         uploadButton.disabled = false;
         fileUploadInput.disabled = false;
     }
@@ -503,6 +508,7 @@ function simulationStep(timestamp) {
         startButtonText.textContent = 'Finished';
         uploadButton.disabled = false;
         fileUploadInput.disabled = false;
+        startButton.disabled = false;
         replaySelectorContainer.querySelectorAll('.replay-item').forEach(item => item.style.pointerEvents = 'auto');
         currentTimeDisplay.textContent = duration.toFixed(3);
         maxComboDisplay.textContent = maxCombo;
