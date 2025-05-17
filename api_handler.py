@@ -1,4 +1,6 @@
 import os
+import time
+import threading
 
 import uvicorn
 import uuid
@@ -292,7 +294,19 @@ class Client(FastAPI):
 
         return JSONResponse(content=final_data.to_dict())
 
+def keep_alive():
+    """
+    Keep the server alive
+    """
+    try:
+        while True:
+            logger.debug("Still Alive...")
+            time.sleep(40)
+    except KeyboardInterrupt:
+        pass
+
 if __name__ == '__main__':
     logger = getLogger(__name__)
     logger.info("Starting server on port 8000 using uvicorn...")
+    threading.Thread(target=keep_alive, daemon=True).start()
     uvicorn.run(Client, factory=True, host="0.0.0.0", port=8000, log_config=setup_logging.LOGGING_CONFIG)
