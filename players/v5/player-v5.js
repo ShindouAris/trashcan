@@ -14,6 +14,7 @@ const replaySelectorContainer = document.getElementById('replaySelectorContainer
 const songTitleDisplay = document.getElementById('songTitleDisplay');
 const songModsDisplay = document.getElementById('songModsDisplay');
 const songDifficultyDisplay = document.getElementById('songDifficultyDisplay');
+const header_badge = document.querySelector(".header-badge");
 const songRatingDisplay = document.getElementById('songRatingDisplay');
 const totalEventsDisplay = document.getElementById('totalEventsDisplay');
 
@@ -58,6 +59,14 @@ const ACCURACY_BAR_COLORS = {
     GOOD:    "rgba(245,190,11,0.6)",
     MISS:    "rgba(239, 68, 68, 0.5)"
 };
+const difficultyColors = {
+    "EASY": "#4ade80",
+    "NORMAL": "#38bdf8",
+    "HARD": "#fbbf24",
+    "EXPERT": "#f32323",
+    "MASTER": "#6366F1FF",
+    "APPEND": "#ffdcff",
+}
 const LINE_FADE_DURATION_MS = 2000;
 
 function decodeDelta(deltaArray) {
@@ -397,12 +406,16 @@ function loadSelectedReplayData(replayKey) {
         updateStatus(`Error: No input events after processing for "${replayKey}".`, true);
         return;
     }
+    const lightTextDifficulties = ['EXPERT', 'MASTER', 'APPEND'];
     const metadata = currentReplayData.metadata;
     if (metadata) {
         songTitleDisplay.textContent = metadata.title || 'N/A';
         songModsDisplay.textContent = Array.isArray(metadata.mod) ? metadata.mod.join(', ') : (metadata.mod || 'NO-MOD');
         songDifficultyDisplay.textContent = metadata.difficulty || 'N/A';
+        const diff = metadata.difficulty || "NORMAL";
+        header_badge.style.backgroundColor = difficultyColors[metadata.difficulty] || '#9ca3af';
         songRatingDisplay.textContent = metadata.rating != null ? metadata.rating : 'N/A';
+        header_badge.style.color = lightTextDifficulties.includes(diff) ? 'white' : 'black';
     }
     totalEventsDisplay.textContent = processedInputs.length;
     totalDurationDisplay.textContent = duration.toFixed(2);
