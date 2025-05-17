@@ -12,5 +12,5 @@
 > - run the server: `python3 main.py` or `python main.py` or `py main.py`
 
 > Server Default Port:
-> - 8080
+> - 8000
 > - You can change the port in the `main.py` file by changing the `port` variable.
