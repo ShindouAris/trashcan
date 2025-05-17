@@ -35,7 +35,7 @@ const ctx = canvas.getContext('2d');
 const fileNameDisplayElement = document.getElementById('fileNameDisplay');
 const fileSizeDisplayElement = document.getElementById('fileSizeDisplay');
 
-const BACKEND_UPLOAD_URL = 'http://192.168.1.8:8000/replayv2';
+const BACKEND_UPLOAD_URL = 'http://40.76.122.0:8000/replayv2';
 
 let allReplaysData = null;
 let currentReplayKey = null;
