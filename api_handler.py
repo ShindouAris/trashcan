@@ -295,4 +295,4 @@ class Client(FastAPI):
 if __name__ == '__main__':
     logger = getLogger(__name__)
     logger.info("Starting server on port 8000 using uvicorn...")
-    uvicorn.run("api_handler:Client", factory=True, host="0.0.0.0", port=8000, reload=True, log_config=setup_logging.LOGGING_CONFIG)
+    uvicorn.run(Client, factory=True, host="0.0.0.0", port=8000, log_config=setup_logging.LOGGING_CONFIG)

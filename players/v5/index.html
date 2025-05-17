@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Replay Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+<div class="container">
+    <header class="main-header">
+        <h1>Replay Viewer</h1>
+        <p class="subtitle">Visualize and analyze your gameplay performance</p>
+    </header>
+
+    <!-- Upload Section -->
+    <section class="card upload-section">
+        <h2>Upload Replay</h2>
+        <div class="file-drop-zone">
+            <input type="file" id="replayUploadFile" class="file-input-hidden" accept=".zip,.scp">
+            <label for="replayUploadFile" class="file-drop-label">
+                <div class="upload-icon-placeholder">
+                    <svg width="45px" height="45px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path opacity="0.5" fill-rule="evenodd" clip-rule="evenodd" d="M3 14.25C3.41421 14.25 3.75 14.5858 3.75 15C3.75 16.4354 3.75159 17.4365 3.85315 18.1919C3.9518 18.9257 4.13225 19.3142 4.40901 19.591C4.68577 19.8678 5.07435 20.0482 5.80812 20.1469C6.56347 20.2484 7.56459 20.25 9 20.25H15C16.4354 20.25 17.4365 20.2484 18.1919 20.1469C18.9257 20.0482 19.3142 19.8678 19.591 19.591C19.8678 19.3142 20.0482 18.9257 20.1469 18.1919C20.2484 17.4365 20.25 16.4354 20.25 15C20.25 14.5858 20.5858 14.25 21 14.25C21.4142 14.25 21.75 14.5858 21.75 15V15.0549C21.75 16.4225 21.75 17.5248 21.6335 18.3918C21.5125 19.2919 21.2536 20.0497 20.6517 20.6516C20.0497 21.2536 19.2919 21.5125 18.3918 21.6335C17.5248 21.75 16.4225 21.75 15.0549 21.75H8.94513C7.57754 21.75 6.47522 21.75 5.60825 21.6335C4.70814 21.5125 3.95027 21.2536 3.34835 20.6517C2.74643 20.0497 2.48754 19.2919 2.36652 18.3918C2.24996 17.5248 2.24998 16.4225 2.25 15.0549C2.25 15.0366 2.25 15.0183 2.25 15C2.25 14.5858 2.58579 14.25 3 14.25Z" fill="#1C274C"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2.25C12.2106 2.25 12.4114 2.33852 12.5535 2.49392L16.5535 6.86892C16.833 7.17462 16.8118 7.64902 16.5061 7.92852C16.2004 8.20802 15.726 8.18678 15.4465 7.88108L12.75 4.9318V16C12.75 16.4142 12.4142 16.75 12 16.75C11.5858 16.75 11.25 16.4142 11.25 16V4.9318L8.55353 7.88108C8.27403 8.18678 7.79963 8.20802 7.49393 7.92852C7.18823 7.64902 7.16698 7.17462 7.44648 6.86892L11.4465 2.49392C11.5886 2.33852 11.7894 2.25 12 2.25Z" fill="#1C274C"/>
+                    </svg>
+                </div>
+                <p>Selected file: <strong id="fileNameDisplay">No file selected</strong></p>
+                <p class="file-meta"><span id="fileSizeDisplay">N/A</span> • Click to change</p>
+            </label>
+        </div>
+        <button id="uploadButton" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-svg-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            Upload & Process
+        </button>
+    </section>
+
+    <!-- Status Message Section -->
+    <section class="status-card" id="statusCard" style="display: none;">
+        <span class="status-icon" id="statusIconElement">ⓘ</span> <!-- Unicode Info Icon -->
+        <p id="statusTextElement">Status message will appear here.</p>
+    </section>
+
+    <!-- Replay Selector Section (Tạo động bằng JS) -->
+    <section class="card replay-selector-card" id="replaySelectorCard" style="display: none;">
+        <h2>Select Replay</h2>
+        <div id="replaySelectorContainer">
+        </div>
+    </section>
+
+    <!-- Replay Display Section -->
+    <section class="card replay-display-section" id="displaySection" style="display: none;">
+        <header class="replay-display-header">
+            <div>
+                <h2 id="songTitleDisplay">Song Title</h2>
+                <div class="header-meta">
+                    <span>Mod(s): <strong id="songModsDisplay">N/A</strong></span>
+                    <span>Total Events: <strong id="totalEventsDisplay">0</strong></span>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span id="songDifficultyDisplay">DIFFICULTY</span> - Rating: <span id="songRatingDisplay">00</span>
+            </div>
+        </header>
+
+        <div class="counts-grid">
+            <div class="count-item perfect">
+                <div class="count-value" id="perfectCountDisplay">0</div>
+                <div class="count-label">Perfect</div>
+                <div class="count-icon-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="count-svg-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                </div>
+            </div>
+            <div class="count-item great">
+                <div class="count-value" id="greatCountDisplay">0</div>
+                <div class="count-label">Great</div>
+                <div class="count-icon-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="count-svg-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.82.61l-4.725-2.885a.563.563 0 00-.652 0l-4.725 2.885a.562.562 0 01-.82-.61l1.285-5.385a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
+                </div>
+            </div>
+            <div class="count-item good">
+                <div class="count-value" id="goodCountDisplay">0</div>
+                <div class="count-label">Good</div>
+                <div class="count-icon-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="count-svg-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M6.633 10.5l-1.07-1.07m1.07 1.07V15m1.07-4.5L6.633 10.5m0 0L5.563 9.43" /></svg>
+                </div>
+            </div>
+            <div class="count-item miss">
+                <div class="count-value" id="missCountDisplay">0</div>
+                <div class="count-label">Miss</div>
+                <div class="count-icon-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="count-svg-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="progress-info-bar">
+            <span>⏰ Time</span>
+            <span class="time-display">
+                    <span id="currentTimeDisplay">0.000</span> / <span id="totalDurationDisplay">0.00</span>
+                </span>
+        </div>
+
+        <div class="combo-info-bar">
+            <div>
+                <span>⚡ Current Combo</span>
+                <strong id="currentComboDisplay">0</strong>
+            </div>
+            <div>
+                <span>💾 Max Combo</span>
+                <strong id="maxComboDisplay">0</strong>
+            </div>
+        </div>
+
+        <div id="visualizerContainer" class="accuracy-visualizer-wrapper">
+            <h3>Accuracy Visualizer</h3>
+            <div class="accuracy-labels">
+                <span>Early</span>
+                <span>Perfect</span>
+                <span>Late</span>
+            </div>
+            <canvas id="accuracyVisualizerCanvas"></canvas>
+        </div>
+
+        <button id="startButton" class="btn btn-simulate" disabled>
+            <svg width="25px" height="25px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier">
+                <path d="M21.4086 9.35258C23.5305 10.5065 23.5305 13.4935 21.4086 14.6474L8.59662 21.6145C6.53435 22.736 4 21.2763 4 18.9671L4 5.0329C4 2.72368 6.53435 1.26402 8.59661 2.38548L21.4086 9.35258Z" fill="#d6b8e0"></path>
+            </g></svg>
+            <span id="startButtonText">Start Simulation</span>
+        </button>
+    </section>
+</div>
+
+<script src="player-v5.js"></script>
+</body>
+</html>
