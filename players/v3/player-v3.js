@@ -20,7 +20,7 @@ const visualizerWrapper = document.getElementById('visualizer-container');
 const canvas = document.getElementById('accuracy-visualizer');
 const ctx = canvas.getContext('2d');
 
-const BACKEND_UPLOAD_URL = 'https://40.76.122.0:8000/replayv1';
+const BACKEND_UPLOAD_URL = 'https://...:8000/replayv1';
 
 
 let fullBackendData = null; // Store the entire response
