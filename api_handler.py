@@ -342,7 +342,7 @@ class Client(FastAPI):
 
 
 
-        return FileResponse(log_files[0], media_type="application/octet-stream", filename=log_files[0].name)
+        return FileResponse(log_files[0], media_type="text/plain", filename=log_files[0].name)
 
 def keep_alive():
     """
