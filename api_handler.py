@@ -341,7 +341,7 @@ class Client(FastAPI):
             self.raise_error(code=404, message="No log files found.")
             return
 
-        with open(log_files[0], "rb") as f:
+        with open(log_files[0], "r") as f:
             log_content = f.read()
             if not log_content:
                 self.raise_error(code=404, message="Log file is empty.")
