@@ -2,3 +2,4 @@ fastapi
 uvicorn
 colorama
 python-multipart
+python-dotenv

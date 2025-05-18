@@ -6,7 +6,7 @@ import uvicorn
 import uuid
 import shutil
 import zipfile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pathlib import Path
 from utils.v2 import (
@@ -28,9 +28,38 @@ from utils.v1 import (
 from fastapi.middleware.cors import CORSMiddleware
 from logging import getLogger
 import setup_logging
+from dotenv import load_dotenv
+import datetime
 
+load_dotenv()
 
 setup_logging.setup_logger()
+
+class AuthSession:
+    def __init__(self, session_uuid: str, ip_address: str, timestamp: float):
+        self.session_uuid = session_uuid
+        self.ip_address = ip_address
+        self.timestamp = timestamp
+
+    @staticmethod
+    def get_current_timestamp() -> float:
+        return datetime.datetime.utcnow().timestamp()
+
+    def get(self):
+        if self.get_current_timestamp() - self.timestamp > 3600.0:
+            return {}
+
+        self.timestamp = self.get_current_timestamp()
+        return {
+            "session_uuid": self.session_uuid,
+            "ip_address": self.ip_address,
+            "timestamp": self.timestamp
+        }
+
+    def delete(self):
+        self.session_uuid = None
+        self.ip_address = None
+        self.timestamp = None
 
 
 class Client(FastAPI):
@@ -44,10 +73,12 @@ class Client(FastAPI):
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        self.session: dict[str, AuthSession] = {}
         self.log = getLogger(__name__)
         self.log.info("API Handler Client initialized for V2 (multi-replay support).")
         self.add_api_route("/replayv2", self.send_replay, methods=["POST"])
         self.add_api_route("/replayv1", self.replay_v1_handler, methods=["POST"])
+        self.add_api_route("/get_log", self.get_log, methods=["GET"])
 
     @staticmethod
     def generate_uuid():
@@ -149,11 +180,10 @@ class Client(FastAPI):
                         resolved_gameplay_data_path = gameplay_data_gzip_path # Already resolved
 
                         is_safe_path = False
-                        # Python 3.9+ Path.is_relative_to is preferred
                         if hasattr(Path, 'is_relative_to'):
                             if resolved_gameplay_data_path.is_relative_to(resolved_sonolus_content_dir):
                                 is_safe_path = True
-                        else: # Fallback for older Python versions
+                        else:
                             try:
                                 common = Path(os.path.commonpath([str(resolved_sonolus_content_dir), str(resolved_gameplay_data_path)]))
                                 if common == resolved_sonolus_content_dir:
@@ -163,8 +193,6 @@ class Client(FastAPI):
 
                         if not is_safe_path:
                             self.log.warning(f"[{request_uuid}/{item_processing_uuid}] Security Alert or Path Mismatch: Resolved GZIP path {resolved_gameplay_data_path} is not confirmed to be within {resolved_sonolus_content_dir}. Check archive structure and JSON URLs.")
-                            # Optionally, add a fallback or raise an error here if strict path checking is required
-                            # For now, we'll proceed but this warning is important.
                     except Exception as e_path_check:
                         self.log.error(f"[{request_uuid}/{item_processing_uuid}] Error during path safety check: {e_path_check}", exc_info=True)
 
@@ -293,6 +321,28 @@ class Client(FastAPI):
         self.clean_up(file_location)
 
         return JSONResponse(content=final_data.to_dict())
+
+    async def get_log(self, authentication_key: str = None):
+        """
+        Endpoint to get the log, requires authentication
+        """
+
+        if authentication_key != os.environ.get("ADMIN_KEY"):
+            self.raise_error(code=403, message="Forbidden: Invalid authentication.")
+            return
+        log_path = Path("./.logs")
+        if not log_path.exists():
+            self.raise_error(code=404, message="Log file not found.")
+            return
+
+        log_files = list(log_path.glob("*.log"))
+        if not log_files:
+            self.raise_error(code=404, message="No log files found.")
+            return
+
+
+
+        return FileResponse(log_files[0], media_type="application/octet-stream", filename=log_files[0].name)
 
 def keep_alive():
     """

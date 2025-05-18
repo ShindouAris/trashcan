@@ -50,14 +50,14 @@ let perfectCount = 0, greatCount = 0, goodCount = 0, missCount = 0;
 let duration = 0;
 let activeLines = [];
 
-const judgmentVizColorMap = { 0: "#ef4444", 1: "#1073b9", 2: "#79f63b", 3: "#f59e0b", default: "#9ca3af" };
+const judgmentVizColorMap = { 0: "#ef4444", 1: "#22a4ff", 2: "#79f63b", 3: "#ffa511", default: "#9ca3af" };
 const VISUALIZER_ACCURACY_RANGE = 0.15;
 const ACCURACY_THRESHOLDS = { PERFECT: 0.043, GREAT: 0.083, GOOD: 0.128, MISS: 0.130 };
 const ACCURACY_BAR_COLORS = {
-    PERFECT: "rgba(16,115,185,0.8)",
-    GREAT:   "rgba(71,246,59,0.7)",
-    GOOD:    "rgba(245,190,11,0.6)",
-    MISS:    "rgba(239, 68, 68, 0.5)"
+    PERFECT: "rgba(14,95,150,0.8)",
+    GREAT:   "rgba(58,189,48,0.7)",
+    GOOD:    "rgba(199,156,12,0.6)",
+    MISS:    "rgba(173,53,53,0.5)"
 };
 const difficultyColors = {
     "EASY": "#4ade80",
@@ -375,7 +375,7 @@ function loadSelectedReplayData(replayKey) {
     duration = parseFloat(replay.duration);
 
     if (!inputs.time || !inputs.judgment || !inputs.accuracy) {
-        updateStatus(`Error: Replay "${replayKey}" missing time, judgment, or accuracy.", true`);
+        updateStatus(`Error: Replay "${replayKey}" missing time, judgment, or accuracy."`, true);
         return;
     }
 

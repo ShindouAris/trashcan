@@ -11,10 +11,10 @@ from logging.config import dictConfig
 from colorama import Fore, Style, init
 
 try:
-    open(".logs/log.log", "a").close()
+    open(".logs/Access_log.log", "a").close()
 except FileNotFoundError:
     makedirs(".logs", exist_ok=True)
-    open(".logs/log.log", "w").close()
+    open(".logs/Access_log.log", "w").close()
 
 asyncio_logger = getLogger("asyncio")
 
@@ -58,7 +58,7 @@ debugHandler.setLevel(DEBUG)
 debugHandler.addFilter(SpectificLevelFilter(DEBUG))
 debugHandler.setFormatter(Formatter(DEBUG_FORMAT, datefmt=DATEFMT))
 
-fileHandler = FileHandler(".logs/SessionLog.log", mode="w", encoding="utf-8")
+fileHandler = FileHandler(".logs/Access_log.log", mode="w", encoding="utf-8")
 fileHandler.setLevel(INFO)
 fileHandler.setFormatter(Formatter("%(asctime)s %(name)s:%(lineno)d [%(levelname)s] - %(message)s", datefmt=DATEFMT))
 
@@ -145,7 +145,7 @@ LOGGING_CONFIG = {
             "class": "logging.FileHandler",
             "formatter": "file",
             "level": "INFO",
-            "filename": ".logs/SessionLog.log",
+            "filename": ".logs/Access_log.log",
             "mode": "w",
             "encoding": "utf-8"
         }
