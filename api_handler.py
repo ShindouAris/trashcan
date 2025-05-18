@@ -6,7 +6,7 @@ import uvicorn
 import uuid
 import shutil
 import zipfile
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pathlib import Path
 from utils.v2 import (
@@ -78,7 +78,7 @@ class Client(FastAPI):
         self.log.info("API Handler Client initialized for V2 (multi-replay support).")
         self.add_api_route("/replayv2", self.send_replay, methods=["POST"])
         self.add_api_route("/replayv1", self.replay_v1_handler, methods=["POST"])
-        self.add_api_route("/get_log", self.get_log, methods=["GET"])
+        self.add_api_route("/get_log", self.get_log, methods=["GET", "HEAD"])
 
     @staticmethod
     def generate_uuid():
@@ -330,6 +330,7 @@ class Client(FastAPI):
         if authentication_key != os.environ.get("ADMIN_KEY"):
             self.raise_error(code=403, message="Forbidden: Invalid authentication.")
             return
+
         log_path = Path("./.logs")
         if not log_path.exists():
             self.raise_error(code=404, message="Log file not found.")
@@ -340,9 +341,15 @@ class Client(FastAPI):
             self.raise_error(code=404, message="No log files found.")
             return
 
+        with open(log_files[0], "rb") as f:
+            log_content = f.read()
+            if not log_content:
+                self.raise_error(code=404, message="Log file is empty.")
+                return
 
 
-        return FileResponse(log_files[0], media_type="text/plain", filename=log_files[0].name)
+
+        return JSONResponse(content={"log": log_content})
 
 def keep_alive():
     """
